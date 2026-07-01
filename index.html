@@ -18,6 +18,16 @@ body {
     margin: 15px auto;
     border-radius: 10px;
     max-width: 900px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+input {
+    padding: 8px;
+    width: 70%;
+}
+button {
+    padding: 8px;
+    margin-left: 5px;
+    cursor: pointer;
 }
 table {
     width: 100%;
@@ -47,9 +57,15 @@ th, td {
 </div>
 
 <div class="card">
-<h2>🎤 Voz</h2>
-<button onclick="falar()">Falar</button>
+<h2>➕ Adicionar lançamento</h2>
+
+<input type="text" id="entrada" placeholder="Ex: recebi 5000 ou gastei 200 mercado">
+<button onclick="adicionarTexto()">Adicionar</button>
+<br><br>
+
+<button onclick="falar()">🎤 Falar</button>
 <p id="texto"></p>
+
 </div>
 
 <div class="card">
@@ -60,7 +76,13 @@ th, td {
 <div class="card">
 <h2>📋 Lançamentos</h2>
 <table id="tabela">
-<tr><th>Pessoa</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Valor</th></tr>
+<tr>
+<th>Pessoa</th>
+<th>Tipo</th>
+<th>Categoria</th>
+<th>Descrição</th>
+<th>Valor</th>
+</tr>
 </table>
 </div>
 
@@ -71,30 +93,30 @@ th, td {
 
 <script>
 
-// MÊS
+// ===== MÊS =====
 let mesAtual = new Date().toISOString().slice(0,7);
 document.getElementById("mesSelecionado").value = mesAtual;
 
-// ===== DETECCAO INTELIGENTE =====
+// ===== DETECÇÃO DE TIPO =====
 function identificarTipo(texto){
 
     texto = texto.toLowerCase();
 
-    const palavrasReceita = ["recebi","entrou","ganhei","faturei","faturamento","entrada","receita"];
-    const palavrasDespesa = ["gastei","paguei","comprei","despesa","gastamos"];
+    const receitas = ["recebi","ganhei","entrou","faturei","entrada","salário"];
+    const despesas = ["gastei","paguei","comprei","gastamos"];
 
-    if(palavrasReceita.some(p=>texto.includes(p))) return "receita";
-    if(palavrasDespesa.some(p=>texto.includes(p))) return "despesa";
+    if(receitas.some(p=>texto.includes(p))) return "receita";
+    if(despesas.some(p=>texto.includes(p))) return "despesa";
 
-    // fallback
-    return "despesa";
+    return "despesa"; // fallback
 }
 
 // ===== CLASSIFICAÇÃO =====
 function classificar(texto){
+
     let valor = parseFloat((texto.match(/\d+/) || [0])[0]);
 
-    let categoria="Outros";
+    let categoria = "Outros";
 
     if(texto.includes("mercado")||texto.includes("padaria")||texto.includes("lanche")||texto.includes("feira")) categoria="Alimentação";
     if(texto.includes("gasolina")) categoria="Transporte";
@@ -102,7 +124,7 @@ function classificar(texto){
     if(texto.includes("plano")) categoria="Saúde";
     if(texto.includes("consórcio")||texto.includes("empréstimo")) categoria="Dívidas";
 
-    return {valor,categoria,descricao:texto};
+    return {valor, categoria};
 }
 
 // ===== DADOS =====
@@ -119,7 +141,10 @@ function atualizar(){
     let mes = document.getElementById("mesSelecionado").value;
 
     let tabela = document.getElementById("tabela");
-    tabela.innerHTML = "<tr><th>Pessoa</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Valor</th></tr>";
+    tabela.innerHTML = `
+    <tr>
+    <th>Pessoa</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Valor</th>
+    </tr>`;
 
     let receita=0, despesa=0, categorias={};
 
@@ -130,10 +155,11 @@ function atualizar(){
         if(d.tipo === "receita") receita += d.valor;
         else{
             despesa += d.valor;
-            categorias[d.categoria] = (categorias[d.categoria] || 0) + d.valor;
+            categorias[d.categoria] = (categorias[d.categoria]||0) + d.valor;
         }
 
         let row = tabela.insertRow();
+
         row.insertCell(0).innerText = d.usuario;
         row.insertCell(1).innerText = d.tipo;
         row.insertCell(2).innerText = d.categoria;
@@ -149,17 +175,32 @@ function atualizar(){
     grafico.update();
 }
 
+// ===== ADICIONAR POR TEXTO =====
+function adicionarTexto(){
+
+    let texto = document.getElementById("entrada").value.toLowerCase();
+
+    if(!texto){
+        alert("Digite algo primeiro");
+        return;
+    }
+
+    adicionar(texto);
+
+    document.getElementById("entrada").value = "";
+}
+
 // ===== ADICIONAR =====
 function adicionar(texto){
 
     let user = document.getElementById("usuario").value;
-    let mes = mesAtual;
+    let mes = document.getElementById("mesSelecionado").value;
 
     let tipo = identificarTipo(texto);
     let info = classificar(texto);
 
     if(info.valor === 0){
-        alert("Valor não identificado");
+        alert("Não consegui identificar o valor");
         return;
     }
 
@@ -182,18 +223,18 @@ function falar(){
     let SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if(!SpeechRecognition){
-        alert("Use Chrome");
+        alert("Use Google Chrome");
         return;
     }
 
     let rec = new SpeechRecognition();
-    rec.lang="pt-BR";
+    rec.lang = "pt-BR";
 
     rec.start();
 
     rec.onresult = function(e){
-        let texto=e.results[0][0].transcript.toLowerCase();
-        document.getElementById("texto").innerText=texto;
+        let texto = e.results[0][0].transcript.toLowerCase();
+        document.getElementById("texto").innerText = texto;
         adicionar(texto);
     }
 }
@@ -207,11 +248,15 @@ const grafico = new Chart(document.getElementById("grafico"), {
             data: [],
             backgroundColor: [
                 '#4CAF50','#F44336','#2196F3',
-                '#FFC107','#9C27B0','#FF5722'
+                '#9C27B0','#FFC107','#FF5722',
+                '#009688','#3F51B5'
             ]
         }]
     }
 });
+
+// mudar mês
+document.getElementById("mesSelecionado").addEventListener("change", atualizar);
 
 // iniciar
 window.onload = atualizar;
