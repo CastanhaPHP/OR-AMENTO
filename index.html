@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Controle Financeiro Mensal</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {
+    font-family: Arial;
+    background: #f4f6f8;
+    margin: 20px;
+}
+.card {
+    background: white;
+    padding: 20px;
+    margin: 15px auto;
+    border-radius: 10px;
+    max-width: 900px;
+}
+button { padding:6px 10px; cursor:pointer; }
+.delete { background:red; color:white; }
+.edit { background:orange; color:white; }
+</style>
+</head>
+
+<body>
+
+<div class="card">
+<h2>📅 Mês</h2>
+<input type="month" id="mesSelecionado">
+</div>
+
+<div class="card">
+<h2>👤 Quem está lançando?</h2>
+<select id="usuario">
+<option>Rodrigo</option>
+<option>Bruna</option>
+<option>Júlia</option>
+</select>
+</div>
+
+<div class="card">
+<h2>🎤 Voz</h2>
+<button onclick="falar()">Falar</button>
+<p id="status">Clique para falar</p>
+<p id="texto"></p>
+</div>
+
+<div class="card">
+<h2>💰 Resumo</h2>
+<p id="resumo"></p>
+</div>
+
+<div class="card">
+<h2>📋 Lançamentos</h2>
+<table id="tabela">
+<tr>
+<th>Pessoa</th><th>Categoria</th><th>Descrição</th><th>Valor</th><th>Ações</th>
+</tr>
+</table>
+</div>
+
+<div class="card">
+<h2>📊 Gráfico</h2>
+<canvas id="grafico"></canvas>
+</div>
+
+<script>
+
+// ===== MÊS ATUAL
+let hoje = new Date();
+let mesAtual = hoje.toISOString().slice(0,7);
+document.getElementById("mesSelecionado").value = mesAtual;
+
+// ===== DADOS
+let dados = JSON.parse(localStorage.getItem("dados")) || [];
+
+// ===== 🔥 MIGRAÇÃO AUTOMÁTICA (CORREÇÃO)
+dados = dados.map(d => {
+
+    if(!d.mes) d.mes = mesAtual; // coloca tudo no mês atual
+
+    if(!d.tipo){
+        d.tipo = (d.categoria === "Receita") ? "receita" : "despesa";
+    }
+
+    return d;
+});
+
+salvar();
+
+// ===== SALVAR
+function salvar(){
+    localStorage.setItem("dados", JSON.stringify(dados));
+}
+
+// ===== CLASSIFICAÇÃO
+function classificar(texto){
+    let valor = parseFloat((texto.match(/\d+/) || [0])[0]);
+
+    let categoria="Outros";
+
+    if(texto.includes("mercado")||texto.includes("padaria")||texto.includes("lanche")||texto.includes("feira")) categoria="Alimentação";
+    if(texto.includes("gasolina")) categoria="Transporte";
+    if(texto.includes("escola")) categoria="Família";
+    if(texto.includes("plano")) categoria="Saúde";
+    if(texto.includes("consórcio")||texto.includes("empréstimo")) categoria="Dívidas";
+
+    return {valor,categoria,descricao:texto};
+}
+
+// ===== ATUALIZAR
+function atualizar(){
+
+    let mes = document.getElementById("mesSelecionado").value;
+
+    let tabela = document.getElementById("tabela");
+
+    tabela.innerHTML = `
+    <tr>
+    <th>Pessoa</th><th>Categoria</th><th>Descrição</th><th>Valor</th><th>Ações</th>
+    </tr>`;
+
+    let receita=0, despesa=0, categorias={};
+
+    dados.forEach((d,index)=>{
+
+        if(d.mes !== mes) return;
+
+        if(d.tipo==="receita") receita+=d.valor;
+        else{
+            despesa+=d.valor;
+            categorias[d.categoria]=(categorias[d.categoria]||0)+d.valor;
+        }
+
+        let row = tabela.insertRow();
+
+        row.insertCell(0).innerText=d.usuario;
+        row.insertCell(1).innerText=d.categoria;
+        row.insertCell(2).innerText=d.descricao;
+        row.insertCell(3).innerText="R$ "+d.valor;
+
+        row.insertCell(4).innerHTML=`
+        <button class="edit" onclick="editar(${index})">✏️</button>
+        <button class="delete" onclick="excluir(${index})">🗑️</button>
+        `;
+    });
+
+    let saldo = receita-despesa;
+
+    document.getElementById("resumo").innerText =
+        `Receita: R$ ${receita.toFixed(2)} | Despesas: R$ ${despesa.toFixed(2)} | Saldo: R$ ${saldo.toFixed(2)}`;
+
+    grafico.data.labels=Object.keys(categorias);
+    grafico.data.datasets[0].data=Object.values(categorias);
+    grafico.update();
+}
+
+// ===== ADICIONAR
+function adicionar(texto){
+
+    let user=document.getElementById("usuario").value;
+    let mes=document.getElementById("mesSelecionado").value;
+
+    let d=classificar(texto);
+
+    if(d.valor===0){
+        alert("Valor não identificado");
+        return;
+    }
+
+    let tipo = texto.includes("recebi") ? "receita" : "despesa";
+
+    dados.push({...d,usuario:user,mes:mes,tipo:tipo});
+
+    salvar();
+    atualizar();
+}
+
+// ===== EDITAR
+function editar(index){
+    let novo = prompt("Novo valor:", dados[index].valor);
+
+    if(novo){
+        dados[index].valor = parseFloat(novo);
+        salvar();
+        atualizar();
+    }
+}
+
+// ===== EXCLUIR
+function excluir(index){
+
+    if(confirm("Excluir este lançamento?")){
+        dados.splice(index,1);
+        salvar();
+        atualizar();
+    }
+}
+
+// ===== VOZ
+function falar(){
+
+    let SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if(!SpeechRecognition){
+        alert("Use Chrome para voz");
+        return;
+    }
+
+    let rec = new SpeechRecognition();
+    rec.lang="pt-BR";
+
+    document.getElementById("status").innerText="🎤 Ouvindo...";
+
+    rec.start();
+
+    rec.onresult=function(e){
+        let texto=e.results[0][0].transcript.toLowerCase();
+        document.getElementById("texto").innerText=texto;
+        adicionar(texto);
+    };
+
+    rec.onend=function(){
+        document.getElementById("status").innerText="Clique para falar";
+    };
+}
+
+// ===== GRÁFICO
+const grafico=new Chart(document.getElementById("grafico"),{
+    type:'doughnut',
+    data:{
+        labels:[],
+        datasets:[{
+            data:[],
+            backgroundColor:[
+                '#4CAF50','#F44336','#2196F3',
+                '#9C27B0','#FFC107','#FF5722',
+                '#009688','#3F51B5'
+            ]
+        }]
+    }
+});
+
+// trocar mês
+document.getElementById("mesSelecionado").addEventListener("change", atualizar);
+
+// iniciar
+window.onload=atualizar;
+
+</script>
+
+</body>
+</html>
