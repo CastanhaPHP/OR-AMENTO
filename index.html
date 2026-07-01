@@ -2,8 +2,9 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Controle Financeiro Mensal</title>
+<title>Controle Financeiro Familiar</title>
 
+<!-- ✅ Chart.js CORRETO -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
@@ -18,10 +19,16 @@ body {
     margin: 15px auto;
     border-radius: 10px;
     max-width: 900px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
-button { padding:6px 10px; cursor:pointer; }
-.delete { background:red; color:white; }
-.edit { background:orange; color:white; }
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+th, td {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
 </style>
 </head>
 
@@ -33,19 +40,12 @@ button { padding:6px 10px; cursor:pointer; }
 </div>
 
 <div class="card">
-<h2>👤 Quem está lançando?</h2>
+<h2>👤 Usuário</h2>
 <select id="usuario">
 <option>Rodrigo</option>
 <option>Bruna</option>
 <option>Júlia</option>
 </select>
-</div>
-
-<div class="card">
-<h2>🎤 Voz</h2>
-<button onclick="falar()">Falar</button>
-<p id="status">Clique para falar</p>
-<p id="texto"></p>
 </div>
 
 <div class="card">
@@ -56,186 +56,120 @@ button { padding:6px 10px; cursor:pointer; }
 <div class="card">
 <h2>📋 Lançamentos</h2>
 <table id="tabela">
-<tr>
-<th>Pessoa</th><th>Categoria</th><th>Descrição</th><th>Valor</th><th>Ações</th>
-</tr>
+<tr><th>Pessoa</th><th>Categoria</th><th>Descrição</th><th>Valor</th></tr>
 </table>
 </div>
 
 <div class="card">
-<h2>📊 Gráfico</h2>
+<h2>📊 Distribuição</h2>
 <canvas id="grafico"></canvas>
 </div>
 
 <script>
 
-// ===== MÊS ATUAL
+// ===== MÊS ATUAL =====
 let hoje = new Date();
 let mesAtual = hoje.toISOString().slice(0,7);
 document.getElementById("mesSelecionado").value = mesAtual;
 
-// ===== DADOS
-let dados = JSON.parse(localStorage.getItem("dados")) || [];
+// ===== BASE COMPLETA DOS SEUS DADOS =====
+let dadosBase = [
 
-// ===== 🔥 MIGRAÇÃO AUTOMÁTICA (CORREÇÃO)
-dados = dados.map(d => {
+{usuario:"Rodrigo", categoria:"Receita", descricao:"Receita mensal", valor:16000, mes:mesAtual, tipo:"receita"},
 
-    if(!d.mes) d.mes = mesAtual; // coloca tudo no mês atual
+// MORADIA
+{usuario:"Rodrigo", categoria:"Moradia", descricao:"Condomínio", valor:790, mes:mesAtual, tipo:"despesa"},
+{usuario:"Rodrigo", categoria:"Moradia", descricao:"Energia", valor:250, mes:mesAtual, tipo:"despesa"},
+{usuario:"Rodrigo", categoria:"Moradia", descricao:"Gás", valor:50, mes:mesAtual, tipo:"despesa"},
+{usuario:"Rodrigo", categoria:"Moradia", descricao:"Seguro casa", valor:48, mes:mesAtual, tipo:"despesa"},
 
-    if(!d.tipo){
-        d.tipo = (d.categoria === "Receita") ? "receita" : "despesa";
-    }
+// TRANSPORTE
+{usuario:"Rodrigo", categoria:"Transporte", descricao:"Prestação carro", valor:2578, mes:mesAtual, tipo:"despesa"},
+{usuario:"Rodrigo", categoria:"Transporte", descricao:"Seguro carro", valor:206, mes:mesAtual, tipo:"despesa"},
+{usuario:"Rodrigo", categoria:"Transporte", descricao:"Seguro bike", valor:214.30, mes:mesAtual, tipo:"despesa"},
 
-    return d;
-});
+// FAMÍLIA
+{usuario:"Rodrigo", categoria:"Família", descricao:"Escola Júlia", valor:1400, mes:mesAtual, tipo:"despesa"},
+{usuario:"Rodrigo", categoria:"Família", descricao:"Vôlei Júlia", valor:200, mes:mesAtual, tipo:"despesa"},
+{usuario:"Rodrigo", categoria:"Família", descricao:"Psicóloga Júlia", valor:200, mes:mesAtual, tipo:"despesa"},
 
-salvar();
+// SAÚDE
+{usuario:"Rodrigo", categoria:"Saúde", descricao:"Plano de saúde", valor:1200, mes:mesAtual, tipo:"despesa"},
 
-// ===== SALVAR
-function salvar(){
+// ESTILO DE VIDA
+{usuario:"Bruna", categoria:"Estilo de Vida", descricao:"Academia", valor:200, mes:mesAtual, tipo:"despesa"},
+
+// DÍVIDAS
+{usuario:"Rodrigo", categoria:"Dívidas", descricao:"Empréstimo ML", valor:1900, mes:mesAtual, tipo:"despesa"},
+{usuario:"Rodrigo", categoria:"Dívidas", descricao:"Consórcio", valor:630, mes:mesAtual, tipo:"despesa"},
+
+// VARIÁVEIS
+{usuario:"Rodrigo", categoria:"Alimentação", descricao:"Lanche", valor:50, mes:mesAtual, tipo:"despesa"},
+{usuario:"Júlia", categoria:"Alimentação", descricao:"Padaria", valor:50, mes:mesAtual, tipo:"despesa"},
+{usuario:"Rodrigo", categoria:"Alimentação", descricao:"Feira", valor:50, mes:mesAtual, tipo:"despesa"}
+
+];
+
+// ===== CARREGAMENTO COM PERSISTÊNCIA =====
+let dadosLocal = JSON.parse(localStorage.getItem("dados"));
+
+let dados = (dadosLocal && dadosLocal.length > 0)
+    ? dadosLocal
+    : dadosBase;
+
+if(!dadosLocal){
     localStorage.setItem("dados", JSON.stringify(dados));
 }
 
-// ===== CLASSIFICAÇÃO
-function classificar(texto){
-    let valor = parseFloat((texto.match(/\d+/) || [0])[0]);
-
-    let categoria="Outros";
-
-    if(texto.includes("mercado")||texto.includes("padaria")||texto.includes("lanche")||texto.includes("feira")) categoria="Alimentação";
-    if(texto.includes("gasolina")) categoria="Transporte";
-    if(texto.includes("escola")) categoria="Família";
-    if(texto.includes("plano")) categoria="Saúde";
-    if(texto.includes("consórcio")||texto.includes("empréstimo")) categoria="Dívidas";
-
-    return {valor,categoria,descricao:texto};
-}
-
-// ===== ATUALIZAR
+// ===== ATUALIZAR =====
 function atualizar(){
 
     let mes = document.getElementById("mesSelecionado").value;
 
     let tabela = document.getElementById("tabela");
+    tabela.innerHTML = "<tr><th>Pessoa</th><th>Categoria</th><th>Descrição</th><th>Valor</th></tr>";
 
-    tabela.innerHTML = `
-    <tr>
-    <th>Pessoa</th><th>Categoria</th><th>Descrição</th><th>Valor</th><th>Ações</th>
-    </tr>`;
+    let receita = 0;
+    let despesa = 0;
+    let categorias = {};
 
-    let receita=0, despesa=0, categorias={};
-
-    dados.forEach((d,index)=>{
+    dados.forEach(d => {
 
         if(d.mes !== mes) return;
 
-        if(d.tipo==="receita") receita+=d.valor;
-        else{
-            despesa+=d.valor;
-            categorias[d.categoria]=(categorias[d.categoria]||0)+d.valor;
+        if(d.tipo === "receita") {
+            receita += d.valor;
+        } else {
+            despesa += d.valor;
+
+            categorias[d.categoria] = (categorias[d.categoria] || 0) + d.valor;
         }
 
         let row = tabela.insertRow();
-
-        row.insertCell(0).innerText=d.usuario;
-        row.insertCell(1).innerText=d.categoria;
-        row.insertCell(2).innerText=d.descricao;
-        row.insertCell(3).innerText="R$ "+d.valor;
-
-        row.insertCell(4).innerHTML=`
-        <button class="edit" onclick="editar(${index})">✏️</button>
-        <button class="delete" onclick="excluir(${index})">🗑️</button>
-        `;
+        row.insertCell(0).innerText = d.usuario;
+        row.insertCell(1).innerText = d.categoria;
+        row.insertCell(2).innerText = d.descricao;
+        row.insertCell(3).innerText = "R$ " + d.valor;
     });
 
-    let saldo = receita-despesa;
+    let saldo = receita - despesa;
 
     document.getElementById("resumo").innerText =
         `Receita: R$ ${receita.toFixed(2)} | Despesas: R$ ${despesa.toFixed(2)} | Saldo: R$ ${saldo.toFixed(2)}`;
 
-    grafico.data.labels=Object.keys(categorias);
-    grafico.data.datasets[0].data=Object.values(categorias);
+    grafico.data.labels = Object.keys(categorias);
+    grafico.data.datasets[0].data = Object.values(categorias);
     grafico.update();
 }
 
-// ===== ADICIONAR
-function adicionar(texto){
-
-    let user=document.getElementById("usuario").value;
-    let mes=document.getElementById("mesSelecionado").value;
-
-    let d=classificar(texto);
-
-    if(d.valor===0){
-        alert("Valor não identificado");
-        return;
-    }
-
-    let tipo = texto.includes("recebi") ? "receita" : "despesa";
-
-    dados.push({...d,usuario:user,mes:mes,tipo:tipo});
-
-    salvar();
-    atualizar();
-}
-
-// ===== EDITAR
-function editar(index){
-    let novo = prompt("Novo valor:", dados[index].valor);
-
-    if(novo){
-        dados[index].valor = parseFloat(novo);
-        salvar();
-        atualizar();
-    }
-}
-
-// ===== EXCLUIR
-function excluir(index){
-
-    if(confirm("Excluir este lançamento?")){
-        dados.splice(index,1);
-        salvar();
-        atualizar();
-    }
-}
-
-// ===== VOZ
-function falar(){
-
-    let SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if(!SpeechRecognition){
-        alert("Use Chrome para voz");
-        return;
-    }
-
-    let rec = new SpeechRecognition();
-    rec.lang="pt-BR";
-
-    document.getElementById("status").innerText="🎤 Ouvindo...";
-
-    rec.start();
-
-    rec.onresult=function(e){
-        let texto=e.results[0][0].transcript.toLowerCase();
-        document.getElementById("texto").innerText=texto;
-        adicionar(texto);
-    };
-
-    rec.onend=function(){
-        document.getElementById("status").innerText="Clique para falar";
-    };
-}
-
-// ===== GRÁFICO
-const grafico=new Chart(document.getElementById("grafico"),{
-    type:'doughnut',
-    data:{
-        labels:[],
-        datasets:[{
-            data:[],
-            backgroundColor:[
+// ===== GRÁFICO =====
+const grafico = new Chart(document.getElementById("grafico"), {
+    type: 'doughnut',
+    data: {
+        labels: [],
+        datasets: [{
+            data: [],
+            backgroundColor: [
                 '#4CAF50','#F44336','#2196F3',
                 '#9C27B0','#FFC107','#FF5722',
                 '#009688','#3F51B5'
@@ -244,11 +178,11 @@ const grafico=new Chart(document.getElementById("grafico"),{
     }
 });
 
-// trocar mês
+// troca de mês
 document.getElementById("mesSelecionado").addEventListener("change", atualizar);
 
 // iniciar
-window.onload=atualizar;
+window.onload = atualizar;
 
 </script>
 
