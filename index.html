@@ -2,9 +2,8 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Controle Financeiro Familiar</title>
+<title>Controle Financeiro Inteligente</title>
 
-<!-- ✅ Chart.js CORRETO -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
@@ -19,7 +18,6 @@ body {
     margin: 15px auto;
     border-radius: 10px;
     max-width: 900px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 table {
     width: 100%;
@@ -49,6 +47,12 @@ th, td {
 </div>
 
 <div class="card">
+<h2>🎤 Voz</h2>
+<button onclick="falar()">Falar</button>
+<p id="texto"></p>
+</div>
+
+<div class="card">
 <h2>💰 Resumo</h2>
 <p id="resumo"></p>
 </div>
@@ -56,7 +60,7 @@ th, td {
 <div class="card">
 <h2>📋 Lançamentos</h2>
 <table id="tabela">
-<tr><th>Pessoa</th><th>Categoria</th><th>Descrição</th><th>Valor</th></tr>
+<tr><th>Pessoa</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Valor</th></tr>
 </table>
 </div>
 
@@ -67,57 +71,45 @@ th, td {
 
 <script>
 
-// ===== MÊS ATUAL =====
-let hoje = new Date();
-let mesAtual = hoje.toISOString().slice(0,7);
+// MÊS
+let mesAtual = new Date().toISOString().slice(0,7);
 document.getElementById("mesSelecionado").value = mesAtual;
 
-// ===== BASE COMPLETA DOS SEUS DADOS =====
-let dadosBase = [
+// ===== DETECCAO INTELIGENTE =====
+function identificarTipo(texto){
 
-{usuario:"Rodrigo", categoria:"Receita", descricao:"Receita mensal", valor:16000, mes:mesAtual, tipo:"receita"},
+    texto = texto.toLowerCase();
 
-// MORADIA
-{usuario:"Rodrigo", categoria:"Moradia", descricao:"Condomínio", valor:790, mes:mesAtual, tipo:"despesa"},
-{usuario:"Rodrigo", categoria:"Moradia", descricao:"Energia", valor:250, mes:mesAtual, tipo:"despesa"},
-{usuario:"Rodrigo", categoria:"Moradia", descricao:"Gás", valor:50, mes:mesAtual, tipo:"despesa"},
-{usuario:"Rodrigo", categoria:"Moradia", descricao:"Seguro casa", valor:48, mes:mesAtual, tipo:"despesa"},
+    const palavrasReceita = ["recebi","entrou","ganhei","faturei","faturamento","entrada","receita"];
+    const palavrasDespesa = ["gastei","paguei","comprei","despesa","gastamos"];
 
-// TRANSPORTE
-{usuario:"Rodrigo", categoria:"Transporte", descricao:"Prestação carro", valor:2578, mes:mesAtual, tipo:"despesa"},
-{usuario:"Rodrigo", categoria:"Transporte", descricao:"Seguro carro", valor:206, mes:mesAtual, tipo:"despesa"},
-{usuario:"Rodrigo", categoria:"Transporte", descricao:"Seguro bike", valor:214.30, mes:mesAtual, tipo:"despesa"},
+    if(palavrasReceita.some(p=>texto.includes(p))) return "receita";
+    if(palavrasDespesa.some(p=>texto.includes(p))) return "despesa";
 
-// FAMÍLIA
-{usuario:"Rodrigo", categoria:"Família", descricao:"Escola Júlia", valor:1400, mes:mesAtual, tipo:"despesa"},
-{usuario:"Rodrigo", categoria:"Família", descricao:"Vôlei Júlia", valor:200, mes:mesAtual, tipo:"despesa"},
-{usuario:"Rodrigo", categoria:"Família", descricao:"Psicóloga Júlia", valor:200, mes:mesAtual, tipo:"despesa"},
+    // fallback
+    return "despesa";
+}
 
-// SAÚDE
-{usuario:"Rodrigo", categoria:"Saúde", descricao:"Plano de saúde", valor:1200, mes:mesAtual, tipo:"despesa"},
+// ===== CLASSIFICAÇÃO =====
+function classificar(texto){
+    let valor = parseFloat((texto.match(/\d+/) || [0])[0]);
 
-// ESTILO DE VIDA
-{usuario:"Bruna", categoria:"Estilo de Vida", descricao:"Academia", valor:200, mes:mesAtual, tipo:"despesa"},
+    let categoria="Outros";
 
-// DÍVIDAS
-{usuario:"Rodrigo", categoria:"Dívidas", descricao:"Empréstimo ML", valor:1900, mes:mesAtual, tipo:"despesa"},
-{usuario:"Rodrigo", categoria:"Dívidas", descricao:"Consórcio", valor:630, mes:mesAtual, tipo:"despesa"},
+    if(texto.includes("mercado")||texto.includes("padaria")||texto.includes("lanche")||texto.includes("feira")) categoria="Alimentação";
+    if(texto.includes("gasolina")) categoria="Transporte";
+    if(texto.includes("escola")) categoria="Família";
+    if(texto.includes("plano")) categoria="Saúde";
+    if(texto.includes("consórcio")||texto.includes("empréstimo")) categoria="Dívidas";
 
-// VARIÁVEIS
-{usuario:"Rodrigo", categoria:"Alimentação", descricao:"Lanche", valor:50, mes:mesAtual, tipo:"despesa"},
-{usuario:"Júlia", categoria:"Alimentação", descricao:"Padaria", valor:50, mes:mesAtual, tipo:"despesa"},
-{usuario:"Rodrigo", categoria:"Alimentação", descricao:"Feira", valor:50, mes:mesAtual, tipo:"despesa"}
+    return {valor,categoria,descricao:texto};
+}
 
-];
+// ===== DADOS =====
+let dados = JSON.parse(localStorage.getItem("dados")) || [];
 
-// ===== CARREGAMENTO COM PERSISTÊNCIA =====
-let dadosLocal = JSON.parse(localStorage.getItem("dados"));
-
-let dados = (dadosLocal && dadosLocal.length > 0)
-    ? dadosLocal
-    : dadosBase;
-
-if(!dadosLocal){
+// ===== SALVAR =====
+function salvar(){
     localStorage.setItem("dados", JSON.stringify(dados));
 }
 
@@ -127,39 +119,83 @@ function atualizar(){
     let mes = document.getElementById("mesSelecionado").value;
 
     let tabela = document.getElementById("tabela");
-    tabela.innerHTML = "<tr><th>Pessoa</th><th>Categoria</th><th>Descrição</th><th>Valor</th></tr>";
+    tabela.innerHTML = "<tr><th>Pessoa</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Valor</th></tr>";
 
-    let receita = 0;
-    let despesa = 0;
-    let categorias = {};
+    let receita=0, despesa=0, categorias={};
 
     dados.forEach(d => {
 
         if(d.mes !== mes) return;
 
-        if(d.tipo === "receita") {
-            receita += d.valor;
-        } else {
+        if(d.tipo === "receita") receita += d.valor;
+        else{
             despesa += d.valor;
-
             categorias[d.categoria] = (categorias[d.categoria] || 0) + d.valor;
         }
 
         let row = tabela.insertRow();
         row.insertCell(0).innerText = d.usuario;
-        row.insertCell(1).innerText = d.categoria;
-        row.insertCell(2).innerText = d.descricao;
-        row.insertCell(3).innerText = "R$ " + d.valor;
+        row.insertCell(1).innerText = d.tipo;
+        row.insertCell(2).innerText = d.categoria;
+        row.insertCell(3).innerText = d.descricao;
+        row.insertCell(4).innerText = "R$ " + d.valor;
     });
 
-    let saldo = receita - despesa;
-
     document.getElementById("resumo").innerText =
-        `Receita: R$ ${receita.toFixed(2)} | Despesas: R$ ${despesa.toFixed(2)} | Saldo: R$ ${saldo.toFixed(2)}`;
+        `Receita: R$ ${receita} | Despesas: R$ ${despesa} | Saldo: R$ ${receita-despesa}`;
 
     grafico.data.labels = Object.keys(categorias);
     grafico.data.datasets[0].data = Object.values(categorias);
     grafico.update();
+}
+
+// ===== ADICIONAR =====
+function adicionar(texto){
+
+    let user = document.getElementById("usuario").value;
+    let mes = mesAtual;
+
+    let tipo = identificarTipo(texto);
+    let info = classificar(texto);
+
+    if(info.valor === 0){
+        alert("Valor não identificado");
+        return;
+    }
+
+    dados.push({
+        usuario: user,
+        tipo: tipo,
+        categoria: tipo==="receita" ? "Receita" : info.categoria,
+        descricao: texto,
+        valor: info.valor,
+        mes: mes
+    });
+
+    salvar();
+    atualizar();
+}
+
+// ===== VOZ =====
+function falar(){
+
+    let SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if(!SpeechRecognition){
+        alert("Use Chrome");
+        return;
+    }
+
+    let rec = new SpeechRecognition();
+    rec.lang="pt-BR";
+
+    rec.start();
+
+    rec.onresult = function(e){
+        let texto=e.results[0][0].transcript.toLowerCase();
+        document.getElementById("texto").innerText=texto;
+        adicionar(texto);
+    }
 }
 
 // ===== GRÁFICO =====
@@ -171,15 +207,11 @@ const grafico = new Chart(document.getElementById("grafico"), {
             data: [],
             backgroundColor: [
                 '#4CAF50','#F44336','#2196F3',
-                '#9C27B0','#FFC107','#FF5722',
-                '#009688','#3F51B5'
+                '#FFC107','#9C27B0','#FF5722'
             ]
         }]
     }
 });
-
-// troca de mês
-document.getElementById("mesSelecionado").addEventListener("change", atualizar);
 
 // iniciar
 window.onload = atualizar;
