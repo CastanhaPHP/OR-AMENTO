@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <title>Controle Financeiro Familiar</title>
 
-<!-- ✅ SCRIPT CORRETO -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
@@ -25,11 +24,18 @@ input {
     width: 70%;
 }
 button {
-    padding: 8px;
+    padding: 6px 10px;
+    margin: 2px;
     cursor: pointer;
 }
+.delete { background:red; color:white;}
+.edit { background:orange; color:white;}
 table {
     width: 100%;
+}
+th, td {
+    padding: 8px;
+    border-bottom: 1px solid #ddd;
 }
 </style>
 </head>
@@ -52,15 +58,10 @@ table {
 
 <div class="card">
 <h2>➕ Lançamento</h2>
-
 <input type="text" id="entrada" placeholder="Ex: recebi 5000 ou gastei 200 mercado">
 <button onclick="adicionarTexto()">Adicionar</button>
-
-<br><br>
-
 <button onclick="falar()">🎤 Falar</button>
 <p id="texto"></p>
-
 </div>
 
 <div class="card">
@@ -72,11 +73,7 @@ table {
 <h2>📋 Lançamentos</h2>
 <table id="tabela">
 <tr>
-<th>Pessoa</th>
-<th>Tipo</th>
-<th>Categoria</th>
-<th>Descrição</th>
-<th>Valor</th>
+<th>Pessoa</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Valor</th><th>Ações</th>
 </tr>
 </table>
 </div>
@@ -92,44 +89,21 @@ table {
 let mesAtual = new Date().toISOString().slice(0,7);
 document.getElementById("mesSelecionado").value = mesAtual;
 
-// ===== DADOS INICIAIS COMPLETOS =====
+// ===== BASE INICIAL (só na primeira vez)
 let dadosBase = [
 {usuario:"Rodrigo", tipo:"receita", categoria:"Receita", descricao:"Receita mensal", valor:16000, mes:mesAtual},
-
-{usuario:"Rodrigo", tipo:"despesa", categoria:"Moradia", descricao:"Condomínio", valor:790, mes:mesAtual},
-{usuario:"Rodrigo", tipo:"despesa", categoria:"Moradia", descricao:"Energia", valor:250, mes:mesAtual},
-{usuario:"Rodrigo", tipo:"despesa", categoria:"Moradia", descricao:"Gás", valor:50, mes:mesAtual},
-{usuario:"Rodrigo", tipo:"despesa", categoria:"Moradia", descricao:"Seguro casa", valor:48, mes:mesAtual},
-
-{usuario:"Rodrigo", tipo:"despesa", categoria:"Transporte", descricao:"Carro", valor:2578, mes:mesAtual},
-{usuario:"Rodrigo", tipo:"despesa", categoria:"Transporte", descricao:"Seguro carro", valor:206, mes:mesAtual},
-{usuario:"Rodrigo", tipo:"despesa", categoria:"Transporte", descricao:"Seguro bike", valor:214.30, mes:mesAtual},
-
-{usuario:"Rodrigo", tipo:"despesa", categoria:"Família", descricao:"Escola", valor:1400, mes:mesAtual},
-{usuario:"Rodrigo", tipo:"despesa", categoria:"Família", descricao:"Vôlei", valor:200, mes:mesAtual},
-{usuario:"Rodrigo", tipo:"despesa", categoria:"Família", descricao:"Psicóloga", valor:200, mes:mesAtual},
-
-{usuario:"Rodrigo", tipo:"despesa", categoria:"Saúde", descricao:"Plano saúde", valor:1200, mes:mesAtual},
-
-{usuario:"Bruna", tipo:"despesa", categoria:"Estilo de Vida", descricao:"Academia", valor:200, mes:mesAtual},
-
-{usuario:"Rodrigo", tipo:"despesa", categoria:"Dívidas", descricao:"Empréstimo ML", valor:1900, mes:mesAtual},
-{usuario:"Rodrigo", tipo:"despesa", categoria:"Dívidas", descricao:"Consórcio", valor:630, mes:mesAtual}
+{usuario:"Rodrigo", tipo:"despesa", categoria:"Moradia", descricao:"Condomínio", valor:790, mes:mesAtual}
 ];
 
-// ===== CARREGAR DADOS SEM PERDER HISTÓRICO
+// ===== CARREGAR SEM PERDER HISTÓRICO
 let dadosLocal = JSON.parse(localStorage.getItem("dados"));
+let dados = (dadosLocal && dadosLocal.length > 0) ? dadosLocal : dadosBase;
 
-let dados;
-
-if(dadosLocal && dadosLocal.length > 0){
-    dados = dadosLocal; // ✅ mantém histórico real
-} else {
-    dados = dadosBase; // ✅ primeira carga
+function salvar(){
     localStorage.setItem("dados", JSON.stringify(dados));
 }
 
-// ===== TIPO (INTELIGENTE)
+// ===== IDENTIFICAR TIPO
 function identificarTipo(texto){
 
     const receitas = ["recebi","ganhei","entrou","faturei","salário"];
@@ -141,7 +115,7 @@ function identificarTipo(texto){
     return "despesa";
 }
 
-// ===== CATEGORIA
+// ===== CLASSIFICAR
 function classificar(texto){
 
     let valor = parseFloat((texto.match(/\d+/) || [0])[0]);
@@ -163,26 +137,35 @@ function atualizar(){
     let mes = document.getElementById("mesSelecionado").value;
 
     let tabela = document.getElementById("tabela");
-    tabela.innerHTML = "<tr><th>Pessoa</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Valor</th></tr>";
+    tabela.innerHTML = `
+    <tr>
+    <th>Pessoa</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Valor</th><th>Ações</th>
+    </tr>`;
 
     let receita=0, despesa=0, categorias={};
 
-    dados.forEach(d => {
+    dados.forEach((d,index)=>{
 
         if(d.mes !== mes) return;
 
-        if(d.tipo === "receita") receita += d.valor;
+        if(d.tipo==="receita") receita+=d.valor;
         else{
-            despesa += d.valor;
+            despesa+=d.valor;
             categorias[d.categoria]=(categorias[d.categoria]||0)+d.valor;
         }
 
         let row = tabela.insertRow();
+
         row.insertCell(0).innerText=d.usuario;
         row.insertCell(1).innerText=d.tipo;
         row.insertCell(2).innerText=d.categoria;
         row.insertCell(3).innerText=d.descricao;
         row.insertCell(4).innerText="R$ "+d.valor;
+
+        row.insertCell(5).innerHTML=`
+            <button class="edit" onclick="editar(${index})">✏️</button>
+            <button class="delete" onclick="excluir(${index})">🗑️</button>
+        `;
     });
 
     document.getElementById("resumo").innerText =
@@ -193,20 +176,11 @@ function atualizar(){
     grafico.update();
 }
 
-// ===== ADICIONAR TEXTO
+// ===== ADICIONAR
 function adicionarTexto(){
 
     let texto = document.getElementById("entrada").value.toLowerCase();
-
     if(!texto) return alert("Digite algo");
-
-    adicionar(texto);
-
-    document.getElementById("entrada").value="";
-}
-
-// ===== ADICIONAR
-function adicionar(texto){
 
     let user = document.getElementById("usuario").value;
     let mes = document.getElementById("mesSelecionado").value;
@@ -225,9 +199,32 @@ function adicionar(texto){
         mes:mes
     });
 
-    localStorage.setItem("dados", JSON.stringify(dados));
-
+    salvar();
     atualizar();
+
+    document.getElementById("entrada").value="";
+}
+
+// ===== EDITAR
+function editar(index){
+
+    let novo = prompt("Novo valor:", dados[index].valor);
+
+    if(novo){
+        dados[index].valor = parseFloat(novo);
+        salvar();
+        atualizar();
+    }
+}
+
+// ===== EXCLUIR
+function excluir(index){
+
+    if(confirm("Excluir lançamento?")){
+        dados.splice(index,1);
+        salvar();
+        atualizar();
+    }
 }
 
 // ===== VOZ
@@ -248,12 +245,12 @@ function falar(){
     rec.onresult=function(e){
         let texto=e.results[0][0].transcript.toLowerCase();
         document.getElementById("texto").innerText=texto;
-        adicionar(texto);
+        adicionarTexto(texto);
     }
 }
 
 // ===== GRÁFICO
-const grafico=new Chart(document.getElementById("grafico"),{
+const grafico = new Chart(document.getElementById("grafico"),{
     type:'doughnut',
     data:{
         labels:[],
@@ -268,7 +265,9 @@ const grafico=new Chart(document.getElementById("grafico"),{
     }
 });
 
-// iniciar
+// evento mês
+document.getElementById("mesSelecionado").addEventListener("change", atualizar);
+
 window.onload=atualizar;
 
 </script>
