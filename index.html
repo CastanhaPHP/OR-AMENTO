@@ -2,8 +2,9 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Controle Financeiro Inteligente</title>
+<title>Controle Financeiro Familiar</title>
 
+<!-- ✅ SCRIPT CORRETO -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
@@ -18,7 +19,6 @@ body {
     margin: 15px auto;
     border-radius: 10px;
     max-width: 900px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 input {
     padding: 8px;
@@ -26,16 +26,10 @@ input {
 }
 button {
     padding: 8px;
-    margin-left: 5px;
     cursor: pointer;
 }
 table {
     width: 100%;
-    border-collapse: collapse;
-}
-th, td {
-    padding: 10px;
-    border-bottom: 1px solid #ddd;
 }
 </style>
 </head>
@@ -57,10 +51,11 @@ th, td {
 </div>
 
 <div class="card">
-<h2>➕ Adicionar lançamento</h2>
+<h2>➕ Lançamento</h2>
 
 <input type="text" id="entrada" placeholder="Ex: recebi 5000 ou gastei 200 mercado">
 <button onclick="adicionarTexto()">Adicionar</button>
+
 <br><br>
 
 <button onclick="falar()">🎤 Falar</button>
@@ -87,7 +82,7 @@ th, td {
 </div>
 
 <div class="card">
-<h2>📊 Distribuição</h2>
+<h2>📊 Gráfico</h2>
 <canvas id="grafico"></canvas>
 </div>
 
@@ -97,54 +92,78 @@ th, td {
 let mesAtual = new Date().toISOString().slice(0,7);
 document.getElementById("mesSelecionado").value = mesAtual;
 
-// ===== DETECÇÃO DE TIPO =====
+// ===== DADOS INICIAIS COMPLETOS =====
+let dadosBase = [
+{usuario:"Rodrigo", tipo:"receita", categoria:"Receita", descricao:"Receita mensal", valor:16000, mes:mesAtual},
+
+{usuario:"Rodrigo", tipo:"despesa", categoria:"Moradia", descricao:"Condomínio", valor:790, mes:mesAtual},
+{usuario:"Rodrigo", tipo:"despesa", categoria:"Moradia", descricao:"Energia", valor:250, mes:mesAtual},
+{usuario:"Rodrigo", tipo:"despesa", categoria:"Moradia", descricao:"Gás", valor:50, mes:mesAtual},
+{usuario:"Rodrigo", tipo:"despesa", categoria:"Moradia", descricao:"Seguro casa", valor:48, mes:mesAtual},
+
+{usuario:"Rodrigo", tipo:"despesa", categoria:"Transporte", descricao:"Carro", valor:2578, mes:mesAtual},
+{usuario:"Rodrigo", tipo:"despesa", categoria:"Transporte", descricao:"Seguro carro", valor:206, mes:mesAtual},
+{usuario:"Rodrigo", tipo:"despesa", categoria:"Transporte", descricao:"Seguro bike", valor:214.30, mes:mesAtual},
+
+{usuario:"Rodrigo", tipo:"despesa", categoria:"Família", descricao:"Escola", valor:1400, mes:mesAtual},
+{usuario:"Rodrigo", tipo:"despesa", categoria:"Família", descricao:"Vôlei", valor:200, mes:mesAtual},
+{usuario:"Rodrigo", tipo:"despesa", categoria:"Família", descricao:"Psicóloga", valor:200, mes:mesAtual},
+
+{usuario:"Rodrigo", tipo:"despesa", categoria:"Saúde", descricao:"Plano saúde", valor:1200, mes:mesAtual},
+
+{usuario:"Bruna", tipo:"despesa", categoria:"Estilo de Vida", descricao:"Academia", valor:200, mes:mesAtual},
+
+{usuario:"Rodrigo", tipo:"despesa", categoria:"Dívidas", descricao:"Empréstimo ML", valor:1900, mes:mesAtual},
+{usuario:"Rodrigo", tipo:"despesa", categoria:"Dívidas", descricao:"Consórcio", valor:630, mes:mesAtual}
+];
+
+// ===== CARREGAR DADOS SEM PERDER HISTÓRICO
+let dadosLocal = JSON.parse(localStorage.getItem("dados"));
+
+let dados;
+
+if(dadosLocal && dadosLocal.length > 0){
+    dados = dadosLocal; // ✅ mantém histórico real
+} else {
+    dados = dadosBase; // ✅ primeira carga
+    localStorage.setItem("dados", JSON.stringify(dados));
+}
+
+// ===== TIPO (INTELIGENTE)
 function identificarTipo(texto){
 
-    texto = texto.toLowerCase();
-
-    const receitas = ["recebi","ganhei","entrou","faturei","entrada","salário"];
-    const despesas = ["gastei","paguei","comprei","gastamos"];
+    const receitas = ["recebi","ganhei","entrou","faturei","salário"];
+    const despesas = ["gastei","paguei","comprei"];
 
     if(receitas.some(p=>texto.includes(p))) return "receita";
     if(despesas.some(p=>texto.includes(p))) return "despesa";
 
-    return "despesa"; // fallback
+    return "despesa";
 }
 
-// ===== CLASSIFICAÇÃO =====
+// ===== CATEGORIA
 function classificar(texto){
 
     let valor = parseFloat((texto.match(/\d+/) || [0])[0]);
 
-    let categoria = "Outros";
+    let categoria="Outros";
 
-    if(texto.includes("mercado")||texto.includes("padaria")||texto.includes("lanche")||texto.includes("feira")) categoria="Alimentação";
+    if(texto.includes("mercado")||texto.includes("padaria")||texto.includes("lanche")) categoria="Alimentação";
     if(texto.includes("gasolina")) categoria="Transporte";
     if(texto.includes("escola")) categoria="Família";
     if(texto.includes("plano")) categoria="Saúde";
     if(texto.includes("consórcio")||texto.includes("empréstimo")) categoria="Dívidas";
 
-    return {valor, categoria};
+    return {valor,categoria};
 }
 
-// ===== DADOS =====
-let dados = JSON.parse(localStorage.getItem("dados")) || [];
-
-// ===== SALVAR =====
-function salvar(){
-    localStorage.setItem("dados", JSON.stringify(dados));
-}
-
-// ===== ATUALIZAR =====
+// ===== ATUALIZAR
 function atualizar(){
 
     let mes = document.getElementById("mesSelecionado").value;
 
     let tabela = document.getElementById("tabela");
-    tabela.innerHTML = `
-    <tr>
-    <th>Pessoa</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Valor</th>
-    </tr>`;
+    tabela.innerHTML = "<tr><th>Pessoa</th><th>Tipo</th><th>Categoria</th><th>Descrição</th><th>Valor</th></tr>";
 
     let receita=0, despesa=0, categorias={};
 
@@ -155,16 +174,15 @@ function atualizar(){
         if(d.tipo === "receita") receita += d.valor;
         else{
             despesa += d.valor;
-            categorias[d.categoria] = (categorias[d.categoria]||0) + d.valor;
+            categorias[d.categoria]=(categorias[d.categoria]||0)+d.valor;
         }
 
         let row = tabela.insertRow();
-
-        row.insertCell(0).innerText = d.usuario;
-        row.insertCell(1).innerText = d.tipo;
-        row.insertCell(2).innerText = d.categoria;
-        row.insertCell(3).innerText = d.descricao;
-        row.insertCell(4).innerText = "R$ " + d.valor;
+        row.insertCell(0).innerText=d.usuario;
+        row.insertCell(1).innerText=d.tipo;
+        row.insertCell(2).innerText=d.categoria;
+        row.insertCell(3).innerText=d.descricao;
+        row.insertCell(4).innerText="R$ "+d.valor;
     });
 
     document.getElementById("resumo").innerText =
@@ -175,22 +193,19 @@ function atualizar(){
     grafico.update();
 }
 
-// ===== ADICIONAR POR TEXTO =====
+// ===== ADICIONAR TEXTO
 function adicionarTexto(){
 
     let texto = document.getElementById("entrada").value.toLowerCase();
 
-    if(!texto){
-        alert("Digite algo primeiro");
-        return;
-    }
+    if(!texto) return alert("Digite algo");
 
     adicionar(texto);
 
-    document.getElementById("entrada").value = "";
+    document.getElementById("entrada").value="";
 }
 
-// ===== ADICIONAR =====
+// ===== ADICIONAR
 function adicionar(texto){
 
     let user = document.getElementById("usuario").value;
@@ -199,54 +214,52 @@ function adicionar(texto){
     let tipo = identificarTipo(texto);
     let info = classificar(texto);
 
-    if(info.valor === 0){
-        alert("Não consegui identificar o valor");
-        return;
-    }
+    if(info.valor===0) return alert("Valor não identificado");
 
     dados.push({
-        usuario: user,
-        tipo: tipo,
+        usuario:user,
+        tipo:tipo,
         categoria: tipo==="receita" ? "Receita" : info.categoria,
-        descricao: texto,
-        valor: info.valor,
-        mes: mes
+        descricao:texto,
+        valor:info.valor,
+        mes:mes
     });
 
-    salvar();
+    localStorage.setItem("dados", JSON.stringify(dados));
+
     atualizar();
 }
 
-// ===== VOZ =====
+// ===== VOZ
 function falar(){
 
     let SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if(!SpeechRecognition){
-        alert("Use Google Chrome");
+        alert("Use Chrome");
         return;
     }
 
     let rec = new SpeechRecognition();
-    rec.lang = "pt-BR";
+    rec.lang="pt-BR";
 
     rec.start();
 
-    rec.onresult = function(e){
-        let texto = e.results[0][0].transcript.toLowerCase();
-        document.getElementById("texto").innerText = texto;
+    rec.onresult=function(e){
+        let texto=e.results[0][0].transcript.toLowerCase();
+        document.getElementById("texto").innerText=texto;
         adicionar(texto);
     }
 }
 
-// ===== GRÁFICO =====
-const grafico = new Chart(document.getElementById("grafico"), {
-    type: 'doughnut',
-    data: {
-        labels: [],
-        datasets: [{
-            data: [],
-            backgroundColor: [
+// ===== GRÁFICO
+const grafico=new Chart(document.getElementById("grafico"),{
+    type:'doughnut',
+    data:{
+        labels:[],
+        datasets:[{
+            data:[],
+            backgroundColor:[
                 '#4CAF50','#F44336','#2196F3',
                 '#9C27B0','#FFC107','#FF5722',
                 '#009688','#3F51B5'
@@ -255,11 +268,8 @@ const grafico = new Chart(document.getElementById("grafico"), {
     }
 });
 
-// mudar mês
-document.getElementById("mesSelecionado").addEventListener("change", atualizar);
-
 // iniciar
-window.onload = atualizar;
+window.onload=atualizar;
 
 </script>
 
